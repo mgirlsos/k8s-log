@@ -1,0 +1,79 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logstash-shipper-config
+  namespace: logging
+data:
+  logstash-shipper.conf: |
+    input {
+      beats {
+        port => 7788
+        host => "0.0.0.0"
+      }
+    }
+
+    output {
+      redis {
+        id => "logging_elk_redis"
+        host => ["logging-redis.logging"]
+        port => 6379
+        data_type => list
+        key => "logstash-logging_elk_redis"
+      }
+    }
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: logstash-shipper
+  namespace: logging
+  labels:
+    k8s-app: logstash-shipper
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: logstash-shipper
+  template:
+    metadata:
+      labels:
+        k8s-app: logstash-shipper
+    spec:
+      containers:
+      - name: logstash-shipper
+        image: registry.cn-shanghai.aliyuncs.com/k8s-log/logstash:6.3.2
+        ports:
+        - name: shipper
+          containerPort: 7788
+          protocol: TCP
+        readinessProbe:
+          tcpSocket:
+            port: 7788
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+          periodSeconds: 3
+        volumeMounts:
+        - name: logstash-shipper-config
+          mountPath: /usr/local/logstash/config/pipeline
+      volumes:
+      - name: logstash-shipper-config
+        configMap:
+          name: logstash-shipper-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: logstash-shipper
+  namespace: logging
+  labels:
+    k8s-app: logstash-shipper
+spec:
+  ports:
+  - name: shipper
+    port: 7788
+    protocol: TCP
+    targetPort: shipper
+  selector:
+    k8s-app: logstash-shipper

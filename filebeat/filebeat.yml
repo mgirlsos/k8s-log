@@ -1,0 +1,15 @@
+# setup.template.name: "filebeat"
+# setup.template.pattern: "filebeat-k8s-*"
+logging.level: warning
+filebeat.inputs:
+- type: log
+  # enabled: true
+  paths:
+    - "/log/*"
+fields:
+  k8s-app: log-contanier-file
+output.elasticsearch:
+  hosts: ["elasticsearch:9200"]
+  indices:
+    - index: "filebeat-k8s-%{+YYYY.MM.dd}"
+      default: true
